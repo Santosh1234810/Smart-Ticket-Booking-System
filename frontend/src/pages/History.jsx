@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import API from "../services/api";
+import { buildTicketPath, getTicketUrl } from "../utils/ticket";
 import "../css/Dashboard.css";
 
 const dummyBookingHistory = [
@@ -148,7 +150,9 @@ const liveTemplates = [
   "Organiser shared an important update for your booked event.",
 ];
 
-export default function History() {
+function History() {
+  const navigate = useNavigate();
+  const userName = localStorage.getItem("username") || "User";
   const [notifications, setNotifications] = useState(initialNotifications);
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
@@ -411,13 +415,39 @@ export default function History() {
 
               {expandedId === booking.id && (
                 <div className="ticket-card__detail">
+                  {(() => {
+                    const ticketPath = buildTicketPath({
+                      id: booking.id,
+                      userName,
+                      eventName: booking.event,
+                      venue: booking.venue,
+                      date: booking.eventDate,
+                      amount: booking.amount,
+                      status: booking.status,
+                      category: booking.category,
+                      eventDate: booking.eventDate,
+                    });
+                    const ticketUrl = getTicketUrl({
+                      id: booking.id,
+                      userName,
+                      eventName: booking.event,
+                      venue: booking.venue,
+                      date: booking.eventDate,
+                      amount: booking.amount,
+                      status: booking.status,
+                      category: booking.category,
+                      eventDate: booking.eventDate,
+                    });
+
+                    return (
+                      <>
                   <div className="ticket-card__qr-block">
                     <QRCodeCanvas
-                      value={`${booking.id}|${booking.event}|${booking.venue}|${booking.eventDate}`}
+                      value={ticketUrl}
                       size={128}
                       fgColor="#7f1d1d"
                     />
-                    <p className="ticket-card__qr-label">Scan at venue to validate</p>
+                    <p className="ticket-card__qr-label">Scan to open ticket page</p>
                   </div>
                   <div className="ticket-detail-row">
                     <span className="ticket-detail-label">Booking ID</span>
@@ -443,6 +473,21 @@ export default function History() {
                     <span className="ticket-detail-label">Amount Paid</span>
                     <span className="ticket-detail-value ticket-detail-value--amount">Rs. {booking.amount.toLocaleString("en-IN")}</span>
                   </div>
+                  <div className="ticket-detail-row">
+                    <span className="ticket-detail-label">Download</span>
+                    <span className="ticket-detail-value">
+                      <button
+                        className="ticket-card__btn"
+                        type="button"
+                        onClick={() => navigate(ticketPath)}
+                      >
+                        Open Ticket
+                      </button>
+                    </span>
+                  </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -459,3 +504,5 @@ export default function History() {
     </main>
   );
 }
+
+export default History;

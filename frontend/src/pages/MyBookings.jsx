@@ -2,6 +2,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import API from "../services/api";
+import { buildTicketPath, getTicketUrl } from "../utils/ticket";
 import "../css/MyBookings.css";
 
 const STATUS_META = {
@@ -51,6 +52,7 @@ export default function MyBookings() {
   const [searchParams] = useSearchParams();
   const [expandedId, setExpandedId] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const userName = localStorage.getItem("username") || "User";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [cancelingId, setCancelingId] = useState(null);
@@ -173,7 +175,38 @@ export default function MyBookings() {
             const sm = STATUS_META[b.status] || STATUS_META.Confirmed;
             const catIcon = getCategoryIcon(b.event?.name);
             const isExpanded = expandedId === b.id;
-            const qrValue = `${b.id}|${b.event?.name}|${b.seats?.join(",")}`;
+            const ticketLink = buildTicketPath({
+              id: b.id,
+              userName,
+              eventName: b.event?.name,
+              city: b.event?.city,
+              venue: b.event?.venue,
+              date: b.date,
+              time: b.time,
+              seats: b.seats,
+              amount: b.total,
+              method: b.method,
+              transactionId: b.transactionId,
+              receiptId: b.receiptId,
+              status: b.status,
+              category: b.event?.category,
+            });
+            const qrValue = getTicketUrl({
+              id: b.id,
+              userName,
+              eventName: b.event?.name,
+              city: b.event?.city,
+              venue: b.event?.venue,
+              date: b.date,
+              time: b.time,
+              seats: b.seats,
+              amount: b.total,
+              method: b.method,
+              transactionId: b.transactionId,
+              receiptId: b.receiptId,
+              status: b.status,
+              category: b.event?.category,
+            });
             const cancelable = isCancelable(b);
 
             return (
@@ -231,7 +264,7 @@ export default function MyBookings() {
                     <div className="mb-card__detail">
                       <div className="mb-qr-box">
                         <QRCodeCanvas value={qrValue} size={100} fgColor="#7f1d1d" />
-                        <p className="mb-qr-label">Scan at Venue</p>
+                        <p className="mb-qr-label">Scan to open ticket</p>
                       </div>
                       <div className="mb-detail-rows">
                         <div className="mb-detail-row">
@@ -249,6 +282,18 @@ export default function MyBookings() {
                         <div className="mb-detail-row">
                           <span>Seats</span>
                           <strong>{b.seats?.join(", ")}</strong>
+                        </div>
+                        <div className="mb-detail-row">
+                          <span>Ticket Page</span>
+                          <strong>
+                            <button
+                              type="button"
+                              className="mb-browse-btn"
+                              onClick={() => navigate(ticketLink)}
+                            >
+                              Open & Download
+                            </button>
+                          </strong>
                         </div>
                       </div>
                     </div>

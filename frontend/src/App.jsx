@@ -19,6 +19,7 @@ import Offers from './pages/Offers'
 import History from './pages/History'
 import ResaleTicket from './pages/ResaleTicket'
 import Help from './pages/Help'
+import TicketPreview from './pages/TicketPreview'
 import Success from './pages/Success'
 
 function Layout({ children }) {
@@ -60,6 +61,7 @@ function App() {
         <Route path="/help" element={<Layout><Help /></Layout>} />
         <Route path="/event/:id" element={<Layout><EventDetails /></Layout>} />
         <Route path="/buytickets/:id" element={<Layout><BookingOverview /></Layout>} />
+        <Route path="/ticket/:id" element={<TicketPreview />} />
 
         <Route
           path="/dashboard"
