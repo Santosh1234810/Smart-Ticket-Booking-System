@@ -6,6 +6,7 @@ export default function Success() {
   const navigate = useNavigate();
 
   const bookingId = state?.bookingId || `TK-${Math.floor(1000 + Math.random() * 9000)}`;
+  const eventName = state?.event?.name || "Unknown Event";
   const amount = (state?.total || 0).toLocaleString("en-IN");
   const seats = Array.isArray(state?.seats) ? state.seats.join(", ") : state?.seats || "-";
   const transactionId = state?.transactionId || "Generating...";
@@ -39,12 +40,20 @@ export default function Success() {
                 <span className="success-pill">Confirmed</span>
               </div>
 
-              <h2 className="success-ticket__event">{state.name}</h2>
+              <h2 className="success-ticket__event">{eventName}</h2>
 
               <div className="success-ticket__meta-grid">
                 <div className="success-meta-box">
                   <span>Seats</span>
                   <strong>{seats}</strong>
+                </div>
+                <div className="success-meta-box">
+                  <span>Date</span>
+                  <strong>{state?.date || state?.event?.date || "TBD"}</strong>
+                </div>
+                <div className="success-meta-box">
+                  <span>Time</span>
+                  <strong>{state?.time || "TBD"}</strong>
                 </div>
                 <div className="success-meta-box">
                   <span>Amount Paid</span>
@@ -104,7 +113,7 @@ export default function Success() {
           <button
             type="button"
             className="success-btn success-btn--primary"
-            onClick={() => navigate("/bookings")}
+            onClick={() => navigate(`/bookings?id=${bookingId}`)}
           >
             View My Bookings
           </button>

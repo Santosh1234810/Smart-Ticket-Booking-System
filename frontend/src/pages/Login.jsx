@@ -1,3 +1,13 @@
+// Commented out: Login functionality is disabled
+// 
+// import { useState, useEffect } from "react";
+// import { useNavigate } from "react-router-dom";
+// import { toast } from "react-toastify";
+// import API from "../services/api";
+// import google from "../assets/google.png";
+// import apple from "../assets/apple.png";
+// import "../css/Login.css";
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -6,7 +16,7 @@ import google from "../assets/google.png";
 import apple from "../assets/apple.png";
 import "../css/Login.css";
 
-export default function Login() {
+function Login() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ username: "", password: "" });
@@ -169,3 +179,5 @@ export default function Login() {
     </div>
   );
 }
+
+export default Login;

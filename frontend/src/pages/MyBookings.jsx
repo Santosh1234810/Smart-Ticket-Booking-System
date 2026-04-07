@@ -1,6 +1,7 @@
-﻿import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+﻿import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
+import API from "../services/api";
 import "../css/MyBookings.css";
 
 const STATUS_META = {
@@ -16,54 +17,111 @@ function getCategoryIcon(name = "") {
   return "🎬";
 }
 
-const DEMO_BOOKINGS = [
-  {
-    id: "TK-9012",
-    event: { name: "Pushpa 2", city: "Bangalore" },
-    seats: ["A4", "A5"],
-    total: 2499,
-    date: "Mar 28, 2026",
-    time: "6:30 PM",
-    method: "UPI",
-    status: "Confirmed",
-    transactionId: "UPI20260328001",
-    receiptId: "REC-9012",
-  },
-  {
-    id: "TK-8741",
-    event: { name: "Arijit Singh Live", city: "Bangalore" },
-    seats: ["B12"],
-    total: 1800,
-    date: "Mar 15, 2026",
-    time: "8:00 PM",
-    method: "Card",
-    status: "Confirmed",
-    transactionId: "CRD20260315042",
-    receiptId: "REC-8741",
-  },
-  {
-    id: "TK-7654",
-    event: { name: "IPL Match", city: "Mumbai" },
-    seats: ["D3", "D4", "D5"],
-    total: 3500,
-    date: "Feb 20, 2026",
-    time: "3:30 PM",
-    method: "Net Banking",
-    status: "Completed",
-    transactionId: "NET20260220087",
-    receiptId: "REC-7654",
-  },
-];
+const parseShowDateTime = (date, time) => {
+  if (!date || !time) return null;
+  const base = new Date(date);
+  if (isNaN(base)) return null;
+
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) {
+    const fallback = new Date(`${date} ${time}`);
+    return isNaN(fallback) ? null : fallback;
+  }
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[3].toUpperCase();
+
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  base.setHours(hours, minutes, 0, 0);
+
+  return base;
+};
+
+const isCancelable = (booking) => {
+  if (!booking || booking.status !== "Confirmed") return false;
+  const scheduled = parseShowDateTime(booking.date, booking.time);
+  if (!scheduled) return false;
+  return scheduled.getTime() - Date.now() > 1000 * 60 * 60;
+};
 
 export default function MyBookings() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [expandedId, setExpandedId] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [cancelingId, setCancelingId] = useState(null);
 
-  const stored = localStorage.getItem("bookings");
-  const bookings = (stored ? JSON.parse(stored) : null) || DEMO_BOOKINGS;
+  useEffect(() => {
+    const fetchBookings = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = localStorage.getItem('access');
+        if (!token) {
+          throw new Error('Authentication required to load bookings');
+        }
 
-  const totalSpent = bookings.reduce((s, b) => s + (b.total || 0), 0);
-  const confirmedCount = bookings.filter((b) => b.status === "Confirmed").length;
+        const response = await API.get('/bookings', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setBookings(response.data.bookings || []);
+      } catch (fetchError) {
+        console.error('Failed to load bookings:', fetchError);
+        setError('Unable to load bookings at the moment. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookings();
+  }, []);
+
+  const bookingId = searchParams.get("id");
+  const visibleBookings = bookingId
+    ? bookings.filter((b) => b.id === bookingId)
+    : bookings;
+
+  const handleCancel = async (bookingId) => {
+    const booking = bookings.find((item) => item.id === bookingId);
+    if (!booking || !isCancelable(booking)) return;
+
+    setCancelingId(bookingId);
+    setError(null);
+    try {
+      const token = localStorage.getItem('access');
+      await API.put(
+        `/bookings/${bookingId}/cancel`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setBookings((prev) =>
+        prev.map((item) =>
+          item.id === bookingId ? { ...item, status: 'Canceled' } : item
+        )
+      );
+    } catch (cancelError) {
+      console.error('Canceling booking failed:', cancelError);
+      setError(
+        cancelError?.response?.data?.error ||
+          'Failed to cancel the booking. Please try again.'
+      );
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
+  const totalSpent = visibleBookings.reduce((s, b) => s + (b.total || 0), 0);
+  const confirmedCount = visibleBookings.filter((b) => b.status === "Confirmed").length;
 
   return (
     <main className="mb-page">
@@ -79,7 +137,7 @@ export default function MyBookings() {
 
       <div className="mb-stats">
         <div className="mb-stat">
-          <span className="mb-stat__value">{bookings.length}</span>
+          <span className="mb-stat__value">{visibleBookings.length}</span>
           <span className="mb-stat__label">Total Bookings</span>
         </div>
         <div className="mb-stat-divider" />
@@ -94,7 +152,14 @@ export default function MyBookings() {
         </div>
       </div>
 
-      {bookings.length === 0 ? (
+      {loading ? (
+        <div className="mb-loading">Loading your bookings...</div>
+      ) : error ? (
+        <div className="mb-error">
+          <p>{error}</p>
+          <button type="button" className="mb-browse-btn" onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      ) : visibleBookings.length === 0 ? (
         <div className="mb-empty">
           <span className="mb-empty__icon">🎟️</span>
           <p className="mb-empty__text">No bookings yet. Start exploring!</p>
@@ -104,11 +169,12 @@ export default function MyBookings() {
         </div>
       ) : (
         <div className="mb-grid">
-          {bookings.map((b) => {
+          {visibleBookings.map((b) => {
             const sm = STATUS_META[b.status] || STATUS_META.Confirmed;
             const catIcon = getCategoryIcon(b.event?.name);
             const isExpanded = expandedId === b.id;
             const qrValue = `${b.id}|${b.event?.name}|${b.seats?.join(",")}`;
+            const cancelable = isCancelable(b);
 
             return (
               <div key={b.id} className={`mb-card${isExpanded ? " mb-card--expanded" : ""}`}>
@@ -138,6 +204,20 @@ export default function MyBookings() {
                     </div>
                     <p className="mb-card__amount">Rs. {(b.total || 0).toLocaleString("en-IN")}</p>
                   </div>
+
+                  {cancelable && (
+                    <div className="mb-card__cancel-row">
+                      <button
+                        type="button"
+                        className="mb-cancel-btn"
+                        disabled={cancelingId === b.id}
+                        onClick={() => handleCancel(b.id)}
+                      >
+                        {cancelingId === b.id ? "Canceling..." : "Cancel Ticket"}
+                      </button>
+                      <span className="mb-cancel-note">Cancel up to 1 hour before showtime.</span>
+                    </div>
+                  )}
 
                   <button
                     type="button"

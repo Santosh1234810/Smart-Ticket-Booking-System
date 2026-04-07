@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { QRCodeCanvas } from "qrcode.react";
+import API from "../services/api";
 import "../css/Dashboard.css";
 
-const bookingHistory = [
+const dummyBookingHistory = [
   {
     id: "TK-9012",
     event: "Sunburn Festival 2026",
@@ -42,7 +44,78 @@ const bookingHistory = [
     status: "Canceled",
     amount: 1299,
   },
+  {
+    id: "TK-9013",
+    event: "Pushpa 2",
+    venue: "Bangalore",
+    eventDate: "2026-03-28T18:30:00",
+    category: "Movie",
+    icon: "🎬",
+    status: "Confirmed",
+    amount: 2499,
+  },
+  {
+    id: "TK-8742",
+    event: "Arijit Singh Live",
+    venue: "Bangalore",
+    eventDate: "2026-03-15T20:00:00",
+    category: "Concert",
+    icon: "🎤",
+    status: "Confirmed",
+    amount: 1800,
+  },
 ];
+
+function getCategoryIcon(category = "") {
+  const c = String(category).toLowerCase();
+  if (c.includes("sport") || c.includes("cricket") || c.includes("match")) return "🏏";
+  if (c.includes("concert") || c.includes("live") || c.includes("music")) return "🎤";
+  if (c.includes("comedy")) return "🎭";
+  if (c.includes("movie")) return "🎬";
+  return "🎪";
+}
+
+function getFormattedBookingHistory() {
+  try {
+    const stored = localStorage.getItem("bookings");
+    const storedBookings = stored ? JSON.parse(stored) : [];
+    
+    // Transform stored bookings to match History format
+    const transformedBookings = storedBookings
+      .filter(booking => booking && booking.id) // Filter out invalid bookings
+      .map(booking => {
+        const eventName = typeof booking.event === "string"
+          ? booking.event
+          : booking.event?.name || booking.name || "Event";
+        const eventCity = typeof booking.event === "string"
+          ? booking.venue || booking.city || "Location"
+          : booking.event?.city || booking.city || booking.venue || "Location";
+        
+        return {
+          id: booking.id,
+          event: eventName,
+          venue: eventCity,
+          eventDate: booking.date || booking.eventDate || new Date().toISOString(),
+          category: eventName.includes("IPL") ? "Sports" : eventName.includes("Live") ? "Concert" : "Entertainment",
+          icon: getCategoryIcon(eventName),
+          status: booking.status || "Confirmed",
+          amount: booking.total || booking.amount || 0,
+        };
+      });
+
+    // Combine dummy and stored bookings, avoiding duplicates
+    const combined = [...transformedBookings, ...dummyBookingHistory];
+    const seen = new Set();
+    return combined.filter(b => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+  } catch (error) {
+    console.error("Error processing booking history:", error);
+    return dummyBookingHistory;
+  }
+}
 
 const initialNotifications = [
   {
@@ -80,7 +153,57 @@ export default function History() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
   const [expandedId, setExpandedId] = useState(null);
+  const [bookingHistory, setBookingHistory] = useState([]);
   const notifRef = useRef(null);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem('access');
+        if (!token) {
+          setBookingHistory(getFormattedBookingHistory());
+          return;
+        }
+
+        const response = await API.get('/bookings', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const backendBookings = Array.isArray(response.data.bookings)
+          ? response.data.bookings
+          : [];
+
+        const formatted = backendBookings.map((booking) => {
+          const eventName = typeof booking.event === 'string'
+            ? booking.event
+            : booking.event?.name || 'Event';
+          const eventCity = typeof booking.event === 'string'
+            ? booking.venue || booking.city || 'Location'
+            : booking.event?.city || booking.city || booking.venue || 'Location';
+
+          return {
+            id: booking._id || booking.id,
+            event: eventName,
+            venue: eventCity,
+            eventDate: booking.date || new Date(booking.createdAt).toISOString(),
+            category: eventName.includes('IPL') ? 'Sports' : eventName.includes('Live') ? 'Concert' : 'Entertainment',
+            icon: getCategoryIcon(eventName),
+            status: booking.status || 'Confirmed',
+            amount: booking.total || 0,
+          };
+        });
+
+        setBookingHistory([...formatted, ...dummyBookingHistory]);
+      } catch (error) {
+        console.error('Failed to load booking history:', error);
+        setBookingHistory(getFormattedBookingHistory());
+      }
+    };
+
+    fetchHistory();
+  }, []);
 
   const unreadCount = useMemo(
     () => notifications.filter((note) => !note.isRead).length,
@@ -123,9 +246,18 @@ export default function History() {
   }, []);
 
   const filters = ["All", "Confirmed", "Completed", "Canceled"];
-  const filteredBookings = activeFilter === "All"
-    ? bookingHistory
-    : bookingHistory.filter((b) => b.status === activeFilter);
+  const filteredBookings = useMemo(() => {
+    let bookings = activeFilter === "All"
+      ? bookingHistory
+      : bookingHistory.filter((b) => b.status === activeFilter);
+    
+    // Sort to show Confirmed (booked) events at the top
+    return bookings.sort((a, b) => {
+      if (a.status === "Confirmed" && b.status !== "Confirmed") return -1;
+      if (a.status !== "Confirmed" && b.status === "Confirmed") return 1;
+      return 0; // Keep original order for same status
+    });
+  }, [activeFilter, bookingHistory]);
 
   const getStatusLabel = (status) => {
     if (status === "Confirmed") return "✔ Confirmed";
@@ -279,6 +411,14 @@ export default function History() {
 
               {expandedId === booking.id && (
                 <div className="ticket-card__detail">
+                  <div className="ticket-card__qr-block">
+                    <QRCodeCanvas
+                      value={`${booking.id}|${booking.event}|${booking.venue}|${booking.eventDate}`}
+                      size={128}
+                      fgColor="#7f1d1d"
+                    />
+                    <p className="ticket-card__qr-label">Scan at venue to validate</p>
+                  </div>
                   <div className="ticket-detail-row">
                     <span className="ticket-detail-label">Booking ID</span>
                     <span className="ticket-detail-value">{booking.id}</span>

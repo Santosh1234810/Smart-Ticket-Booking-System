@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import API from "../services/api";
 import "../css/Dashboard.css";
 
 const bookingHistory = [
@@ -106,6 +107,34 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("all");
   const [slideIndex, setSlideIndex] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [loadingWallet, setLoadingWallet] = useState(true);
+
+  useEffect(() => {
+    fetchWalletBalance();
+  }, []);
+
+  const fetchWalletBalance = async () => {
+    try {
+      const token = localStorage.getItem('access');
+      if (!token) {
+        setLoadingWallet(false);
+        return;
+      }
+
+      const response = await API.get("/wallet/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setWalletBalance(response.data.wallet?.balance || 0);
+    } catch (error) {
+      console.error("Failed to fetch wallet:", error);
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -154,6 +183,16 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <section className="db-quick-actions" aria-label="Quick actions">
+        {/* Wallet Card */}
+        <div className="db-wallet-card">
+          <span className="db-wallet-icon">💰</span>
+          <div className="db-wallet-info">
+            <p className="db-wallet-label">Wallet Balance</p>
+            <p className="db-wallet-balance">Rs. {walletBalance.toLocaleString("en-IN")}</p>
+            <small className="db-wallet-tip">Earn rewards on every booking</small>
+          </div>
+        </div>
+
         {quickActions.map((action) => (
           <button
             key={action.label}

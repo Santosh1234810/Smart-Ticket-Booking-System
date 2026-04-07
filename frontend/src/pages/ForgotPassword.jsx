@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import API from "../services/api";
 import "../css/ForgotPassword.css";
 
-export default function ForgotPassword() {
+function ForgotPassword() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1); // 1 = enter email, 2 = enter OTP + new password
@@ -200,3 +200,5 @@ export default function ForgotPassword() {
     </div>
   );
 }
+
+export default ForgotPassword;

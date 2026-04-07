@@ -126,6 +126,64 @@
   flex: 1;
 }
 
+.city-picker-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.city-picker-arrow {
+  color: #9f1239;
+  font-size: 16px;
+}
+
+.city-dropdown {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.12);
+  padding: 8px 0;
+  transform-origin: top center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transform: translateY(-6px);
+}
+
+.city-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.city-dropdown-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 10px 14px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.city-dropdown-item:hover,
+.city-dropdown-item.active {
+  background: #fff0f3;
+  color: #9f1239;
+}
+
 .city-picker-label {
   font-size: 10px;
   font-weight: 600;
@@ -259,6 +317,46 @@
   align-items: center;
   gap: 10px;
   margin-left: auto;
+}
+
+.wallet-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1.5px solid #dbeafe;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.wallet-btn:hover {
+  border-color: #bfdbfe;
+  background: linear-gradient(135deg, #e0f2fe 0%, #cffafe 100%);
+  transform: translateY(-1px);
+}
+
+.wallet-btn:active {
+  transform: translateY(0);
+}
+
+.wallet-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.wallet-label {
+  display: none;
+}
+
+.wallet-balance {
+  font-weight: 800;
+  color: #0c4a6e;
 }
 
 .nav-user {
@@ -435,6 +533,15 @@
     width: 100%;
     justify-content: stretch;
     flex-wrap: wrap;
+  }
+
+  .wallet-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .wallet-label {
+    display: inline;
   }
 
   .nav-user {

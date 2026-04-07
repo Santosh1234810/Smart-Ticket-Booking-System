@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import API from "../services/api";
+import { offersData, getOfferByCode, isOfferValid, calculateDiscount } from "../data/offers";
 import "../css/Payment.css";
 
 export default function Payment() {
@@ -16,15 +18,61 @@ export default function Payment() {
   const [saveDetails, setSaveDetails] = useState(false);
   const [formError, setFormError] = useState("");
   const [paying, setPaying] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletAmount, setWalletAmount] = useState(0);
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
+  const [discountDescription, setDiscountDescription] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [showAvailableOffers, setShowAvailableOffers] = useState(false);
+
+  useEffect(() => {
+    fetchWalletBalance();
+  }, []);
+
+  const fetchWalletBalance = async () => {
+    try {
+      const token = localStorage.getItem('access');
+      if (!token) return;
+
+      const response = await API.get("/wallet/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setWalletBalance(response.data.wallet?.balance || 0);
+    } catch (error) {
+      console.error("Failed to fetch wallet:", error);
+    }
+  };
 
   if (!state) return <p>No booking data found.</p>;
 
-  const { name, seats, total } = state;
+  const { event, seats, total, date } = state;
+  const eventName = event?.name || "Unknown Event";
+  const eventCity = event?.city || "Unknown City";
+  const showDate = date || event?.date || "TBD";
   const seatCount = Array.isArray(seats) ? seats.length : 1;
   const subTotal = total || 0;
   const convenienceFee = Math.round(subTotal * 0.02);
-  const gst = Math.round(convenienceFee * 0.18);
-  const finalAmount = subTotal + convenienceFee + gst;
+  const gst = Math.round((subTotal + convenienceFee) * 0.05);
+  const baseAmount = subTotal + convenienceFee + gst;
+
+  // Calculate discount (e.g., 5% on base amount)
+  let couponDiscount = 0;
+  let couponDescription = "";
+  if (appliedCoupon) {
+    couponDiscount = calculateDiscount(appliedCoupon, baseAmount);
+    couponDescription = appliedCoupon.title;
+  }
+
+  // Calculate wallet deduction
+  const maxWalletDeduction = useWallet ? Math.min(walletAmount, walletBalance) : 0;
+  
+  // Final amount after coupon discount and wallet
+  const finalAmount = Math.max(0, baseAmount - couponDiscount - maxWalletDeduction);
 
   const normalizedCard = cardNo.replace(/\s+/g, "").replace(/\D/g, "");
   const upiValid = /^[A-Za-z0-9._-]{2,}@[A-Za-z]{2,}$/.test(upiId.trim());
@@ -56,7 +104,62 @@ export default function Payment() {
     return `${digits.slice(0, 2)}/${digits.slice(2)}`;
   };
 
-  const handlePay = (e) => {
+  const handleWalletToggle = (e) => {
+    setUseWallet(e.target.checked);
+    if (e.target.checked) {
+      setWalletAmount(Math.min(walletBalance, baseAmount - calculatedDiscount));
+    } else {
+      setWalletAmount(0);
+    }
+  };
+
+  const handleWalletAmountChange = (e) => {
+    const amount = Math.min(
+      Number(e.target.value) || 0,
+      walletBalance,
+      baseAmount - couponDiscount
+    );
+    setWalletAmount(amount);
+  };
+
+  const applyCoupon = () => {
+    if (!couponCode.trim()) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+
+    const offer = getOfferByCode(couponCode.trim());
+    
+    if (!offer) {
+      toast.error("Invalid coupon code");
+      setCouponCode("");
+      return;
+    }
+
+    if (!isOfferValid(offer)) {
+      toast.error("This coupon has expired");
+      setCouponCode("");
+      return;
+    }
+
+    setAppliedCoupon(offer);
+    setCouponCode("");
+    toast.success(`${offer.title} applied!`);
+  };
+
+  const applyQuickCoupon = (offer) => {
+    setAppliedCoupon(offer);
+    setCouponCode("");
+    toast.success(`${offer.title} applied!`);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    toast.info("Coupon removed");
+  };
+
+  const handlePay = async (e) => {
     e.preventDefault();
     setFormError("");
 
@@ -67,22 +170,73 @@ export default function Payment() {
 
     setPaying(true);
 
+    const bookingId = `TK-${Math.floor(1000 + Math.random() * 9000)}`;
     const transactionId = `TXN${Date.now()}`;
     const receiptId = `RCPT${Math.floor(100000 + Math.random() * 900000)}`;
 
-    setTimeout(() => {
+    const token = localStorage.getItem('access');
+    if (!token) {
+      setFormError('Please sign in to complete payment.');
+      setPaying(false);
+      return;
+    }
+
+    try {
+      const payload = {
+        event: {
+          id: state.event?.id,
+          name: eventName,
+          city: eventCity,
+          venue: state.event?.venue,
+          date: showDate,
+          category: state.event?.category,
+          price: state.unitPrice || state.event?.price,
+        },
+        date: showDate,
+        seats: Array.isArray(state.seats) ? state.seats : [state.seats],
+        total: finalAmount,
+        time: state.time || "TBD",
+        method: method === "upi" ? "UPI" : method === "card" ? "Card" : "Net Banking",
+        transactionId,
+        receiptId,
+        status: "Confirmed",
+        discountApplied: couponDiscount,
+        discountDescription: couponDescription || `Coupon: ${appliedCoupon?.code || ''}`,
+        walletDeducted: maxWalletDeduction,
+      };
+
+      const response = await API.post("/bookings", payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const backendBookingId = response.data.booking?.id || bookingId;
+
       toast.success("Payment successful!");
       navigate("/success", {
         state: {
           ...state,
+          bookingId: backendBookingId,
           total: finalAmount,
-          method: method === "upi" ? "UPI" : method === "card" ? "Card" : "Net Banking",
+          method: payload.method,
           transactionId,
           receiptId,
+          booking: response.data.booking,
           saveDetails,
+          discountApplied: couponDiscount,
+          discountDescription: couponDescription || `Coupon: ${appliedCoupon?.code || ''}`,
+          walletDeducted: maxWalletDeduction,
         },
       });
-    }, 1500);
+    } catch (error) {
+      console.error('Booking API error:', error);
+      setFormError(
+        error.response?.data?.error || 'Payment failed. Please try again.'
+      );
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
@@ -95,11 +249,115 @@ export default function Payment() {
           </div>
 
           <div className="payment-summary">
-            <p className="payment-summary__event">{name}</p>
+            <p className="payment-summary__event">{eventName}</p>
             <p className="payment-summary__seats">
               Seats: {Array.isArray(seats) ? seats.join(", ") : seats}
             </p>
             <p className="payment-summary__meta">Tickets: {seatCount}</p>
+            <p className="payment-summary__meta">Date: {showDate}</p>
+          </div>
+
+          {/* Wallet Section */}
+          {walletBalance > 0 && (
+            <div className="payment-wallet-section">
+              <div className="payment-wallet-header">
+                <h3>💰 Your Wallet</h3>
+                <span className="payment-wallet-balance">Balance: Rs. {walletBalance.toLocaleString("en-IN")}</span>
+              </div>
+              <label className="payment-check">
+                <input
+                  type="checkbox"
+                  checked={useWallet}
+                  onChange={handleWalletToggle}
+                />
+                Use wallet balance for this booking
+              </label>
+              {useWallet && (
+                <div className="payment-field">
+                  <label htmlFor="walletAmount">Amount to use from wallet</label>
+                  <input
+                    id="walletAmount"
+                    type="number"
+                    min="0"
+                    max={Math.min(walletBalance, baseAmount - couponDiscount)}
+                    value={walletAmount}
+                    onChange={handleWalletAmountChange}
+                  />
+                  <small className="payment-hint">
+                    Maximum: Rs. {Math.min(walletBalance, baseAmount - couponDiscount).toLocaleString("en-IN")}
+                  </small>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Coupon Section */}
+          <div className="payment-coupon-section">
+            <div className="payment-coupon-header">
+              <h3>🎟️ Apply Coupon Code</h3>
+              {appliedCoupon && (
+                <span className="payment-coupon-active">✓ {appliedCoupon.code}</span>
+              )}
+            </div>
+
+            <div className="payment-coupon-input">
+              <input
+                type="text"
+                placeholder="Enter coupon code"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                onKeyPress={(e) => e.key === 'Enter' && applyCoupon()}
+              />
+              <button
+                type="button"
+                className="payment-coupon-apply-btn"
+                onClick={applyCoupon}
+              >
+                Apply
+              </button>
+              {appliedCoupon && (
+                <button
+                  type="button"
+                  className="payment-coupon-remove-btn"
+                  onClick={removeCoupon}
+                  title="Remove coupon"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Available Offers */}
+            <div className="payment-coupon-toggle">
+              <button
+                type="button"
+                onClick={() => setShowAvailableOffers(!showAvailableOffers)}
+                className="payment-offers-toggle-btn"
+              >
+                {showAvailableOffers ? '▼' : '▶'} View Available Offers ({offersData.filter(o => isOfferValid(o)).length})
+              </button>
+            </div>
+
+            {showAvailableOffers && (
+              <div className="payment-offers-list">
+                {offersData.map((offer) => (
+                  <button
+                    key={offer.code}
+                    type="button"
+                    className={`payment-offer-item${appliedCoupon?.code === offer.code ? ' active' : ''}${!isOfferValid(offer) ? ' disabled' : ''}`}
+                    onClick={() => isOfferValid(offer) && applyQuickCoupon(offer)}
+                    disabled={!isOfferValid(offer)}
+                  >
+                    <span className="payment-offer-icon">{offer.icon}</span>
+                    <div className="payment-offer-info">
+                      <p className="payment-offer-title">{offer.title}</p>
+                      <p className="payment-offer-code">{offer.code}</p>
+                    </div>
+                    <span className="payment-offer-discount">{offer.discount}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="payment-progress" aria-label="Payment steps">
@@ -246,13 +504,29 @@ export default function Payment() {
             <strong>Rs. {subTotal.toLocaleString("en-IN")}</strong>
           </div>
           <div className="payment-order-row">
-            <span>Convenience Fee</span>
+            <span>Convenience Fee (2%)</span>
             <strong>Rs. {convenienceFee.toLocaleString("en-IN")}</strong>
           </div>
           <div className="payment-order-row">
-            <span>GST</span>
+            <span>GST (5%)</span>
             <strong>Rs. {gst.toLocaleString("en-IN")}</strong>
           </div>
+          <div className="payment-order-row">
+            <span>Subtotal</span>
+            <strong>Rs. {baseAmount.toLocaleString("en-IN")}</strong>
+          </div>
+          {couponDiscount > 0 && appliedCoupon && (
+            <div className="payment-order-row payment-order-row--discount">
+              <span>{appliedCoupon.title} ({appliedCoupon.code})</span>
+              <strong>-Rs. {couponDiscount.toLocaleString("en-IN")}</strong>
+            </div>
+          )}
+          {maxWalletDeduction > 0 && (
+            <div className="payment-order-row payment-order-row--discount">
+              <span>Wallet Used</span>
+              <strong>-Rs. {maxWalletDeduction.toLocaleString("en-IN")}</strong>
+            </div>
+          )}
           <div className="payment-order-row payment-order-row--total">
             <span>Total Payable</span>
             <strong>Rs. {finalAmount.toLocaleString("en-IN")}</strong>

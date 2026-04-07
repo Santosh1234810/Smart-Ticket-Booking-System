@@ -719,6 +719,25 @@
   color: #b91c1c;
 }
 
+.ticket-card__qr-block {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #ffffff;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #ebebeb;
+}
+
+.ticket-card__qr-label {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+}
+
 /* Empty state */
 .history-empty {
   display: flex;
@@ -1068,6 +1087,50 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+}
+
+.db-wallet-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1.5px solid #dbeafe;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  grid-column: 1;
+}
+
+.db-wallet-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.db-wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.db-wallet-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0369a1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.db-wallet-balance {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0c4a6e;
+}
+
+.db-wallet-tip {
+  margin: 0;
+  font-size: 10px;
+  color: #0369a1;
 }
 
 .db-quick-action {
@@ -1433,6 +1496,10 @@
 @media (max-width: 640px) {
   .db-quick-actions {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .db-wallet-card {
+    grid-column: 1 / -1;
   }
 
   .dashboard-hero__title {

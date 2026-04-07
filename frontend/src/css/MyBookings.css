@@ -235,6 +235,41 @@
   border-top: 1px dashed #e5e7eb;
 }
 
+.mb-card__cancel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.mb-cancel-btn {
+  padding: 10px 16px;
+  background: #ffffff;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.13s, transform 0.13s;
+}
+
+.mb-cancel-btn:hover:not(:disabled) {
+  background: #fff1f2;
+  transform: translateY(-1px);
+}
+
+.mb-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mb-cancel-note {
+  font-size: 11px;
+  color: #6b7280;
+}
+
 .mb-card__id {
   margin: 0;
   font-size: 11px;

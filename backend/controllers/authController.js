@@ -57,7 +57,6 @@ const sendOTPEmail = async (email, otp) => {
   return true;
 };
 
-// Signup
 const signup = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -105,7 +104,6 @@ const signup = async (req, res) => {
   }
 };
 
-// Verify OTP
 const verifyOTP = async (req, res) => {
   try {
     const { username, otp } = req.body;
@@ -136,12 +134,13 @@ const verifyOTP = async (req, res) => {
     await user.save();
 
     // Generate token
-    const token = generateToken(user._id, user.username);
+    const token = generateToken(user._id, user.username, user.role || 'user');
 
     res.json({
       message: 'Email verified successfully',
       access: token,
       username: user.username,
+      role: user.role || 'user',
     });
   } catch (error) {
     console.error('OTP verification error:', error.message);
@@ -149,7 +148,6 @@ const verifyOTP = async (req, res) => {
   }
 };
 
-// Login
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -181,12 +179,13 @@ const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id, user.username);
+    const token = generateToken(user._id, user.username, user.role || 'user');
 
     res.json({
       message: 'Login successful',
       access: token,
       username: user.username,
+      role: user.role || 'user',
     });
   } catch (error) {
     console.error('Login error:', error.message);
@@ -194,7 +193,6 @@ const login = async (req, res) => {
   }
 };
 
-// Forgot Password
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -232,7 +230,6 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-// Reset Password
 const resetPassword = async (req, res) => {
   try {
     const { email, otp, new_password } = req.body;
@@ -271,10 +268,71 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const getWallet = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      wallet: {
+        balance: user.wallet?.balance || 0,
+        transactions: user.wallet?.transactions || [],
+      },
+    });
+  } catch (error) {
+    console.error('Get wallet error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch wallet details' });
+  }
+};
+
+const addWalletTransaction = async (userId, amount, type, description, bookingId = null) => {
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (!user.wallet) {
+      user.wallet = { balance: 0, transactions: [] };
+    }
+
+    const transaction = {
+      type,
+      amount,
+      description,
+      bookingId,
+      createdAt: new Date(),
+    };
+
+    user.wallet.transactions.push(transaction);
+
+    if (type === 'credit') {
+      user.wallet.balance += amount;
+    } else if (type === 'debit') {
+      user.wallet.balance -= amount;
+      if (user.wallet.balance < 0) {
+        user.wallet.balance = 0;
+      }
+    }
+
+    await user.save();
+    return user.wallet;
+  } catch (error) {
+    console.error('Add wallet transaction error:', error.message);
+    throw error;
+  }
+};
+
 module.exports = {
   signup,
   verifyOTP,
   login,
   forgotPassword,
   resetPassword,
+  getWallet,
+  addWalletTransaction,
 };

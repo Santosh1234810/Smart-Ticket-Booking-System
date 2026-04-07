@@ -1,3 +1,13 @@
+// Commented out: Signup functionality is disabled
+// 
+// import { useState } from "react";
+// import { useNavigate } from "react-router-dom";
+// import { toast } from "react-toastify";
+// import API from "../services/api";
+// import google from "../assets/google.png";
+// import apple from "../assets/apple.png";
+// import "../css/Signup.css";
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -6,7 +16,7 @@ import google from "../assets/google.png";
 import apple from "../assets/apple.png";
 import "../css/Signup.css";
 
-export default function Signup() {
+function Signup() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
@@ -242,3 +252,5 @@ export default function Signup() {
     </div>
   );
 }
+
+export default Signup;

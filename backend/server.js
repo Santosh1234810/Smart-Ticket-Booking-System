@@ -4,6 +4,8 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
+const bookingRoutes = require('./routes/bookings');
+const supportRoutes = require('./routes/support');
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api', authRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/support', supportRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

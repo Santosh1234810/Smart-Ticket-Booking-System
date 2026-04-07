@@ -86,8 +86,35 @@
 .ss-badge--format { background: rgba(248, 68, 100, 0.15); color: #f84464; border: 1px solid rgba(248, 68, 100, 0.35); }
 
 /* ── Time Selection ── */
+.ss-date-section,
 .ss-time-section {
   padding: 24px 40px 0;
+}
+
+.ss-date-section {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+}
+
+.ss-date-input {
+  width: 220px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.ss-date-input:hover,
+.ss-date-input:focus {
+  border-color: rgba(248, 68, 100, 0.55);
+  background: rgba(248, 68, 100, 0.08);
+  box-shadow: 0 0 0 4px rgba(248, 68, 100, 0.08);
 }
 
 .ss-section-label {

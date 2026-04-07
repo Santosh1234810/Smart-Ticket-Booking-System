@@ -10,11 +10,15 @@ import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import Events from './pages/Events'
 import EventDetails from './pages/EventDetails'
+import BookingOverview from './pages/BookingOverview'
+import ConcertSelection from './pages/ConcertSelection'
 import SeatSelection from './pages/SeatSelection'
 import Payment from './pages/Payment'
 import MyBookings from './pages/MyBookings'
 import Offers from './pages/Offers'
 import History from './pages/History'
+import ResaleTicket from './pages/ResaleTicket'
+import Help from './pages/Help'
 import Success from './pages/Success'
 
 function Layout({ children }) {
@@ -48,21 +52,30 @@ function App() {
       />
       <Routes>
         {/* Public routes */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/events" replace />} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
         <Route path="/signup" element={<Layout><Signup /></Layout>} />
         <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
         <Route path="/events" element={<Layout><Events /></Layout>} />
+        <Route path="/help" element={<Layout><Help /></Layout>} />
         <Route path="/event/:id" element={<Layout><EventDetails /></Layout>} />
+        <Route path="/buytickets/:id" element={<Layout><BookingOverview /></Layout>} />
 
-        {/* Protected routes */}
         <Route
           path="/dashboard"
           element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>}
         />
+        {/* <Route
+          path="/seats"
+          element={<ProtectedRoute><Layout><SeatSelection /></Layout></ProtectedRoute>}
+        /> */}
         <Route
           path="/seats"
           element={<ProtectedRoute><Layout><SeatSelection /></Layout></ProtectedRoute>}
+        />
+        <Route
+          path="/concert-selection"
+          element={<ProtectedRoute><Layout><ConcertSelection /></Layout></ProtectedRoute>}
         />
         <Route
           path="/payment"
@@ -81,12 +94,16 @@ function App() {
           element={<ProtectedRoute><Layout><History /></Layout></ProtectedRoute>}
         />
         <Route
+          path="/resale"
+          element={<ProtectedRoute><Layout><ResaleTicket /></Layout></ProtectedRoute>}
+        />
+        <Route
           path="/success"
           element={<ProtectedRoute><Layout><Success /></Layout></ProtectedRoute>}
         />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/events" replace />} />
       </Routes>
     </BrowserRouter>
   )

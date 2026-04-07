@@ -1,15 +1,23 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
+import API from "../services/api";
 import "../css/SeatSelection.css";
 
 const ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 const SEATS_PER_ROW = 12;
-const TIMES = ["10:00 AM", "02:00 PM", "06:00 PM", "09:30 PM"];
 
 const SEAT_META = {
   PLATINUM: { price: 400, color: "platinum", label: "Platinum" },
   GOLD:     { price: 250, color: "gold",     label: "Gold"     },
   SILVER:   { price: 150, color: "silver",   label: "Silver"   },
+};
+
+const parseToISODate = (value) => {
+  const parsed = new Date(value);
+  if (!isNaN(parsed)) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return new Date().toISOString().slice(0, 10);
 };
 
 function getSeatType(row) {
@@ -23,25 +31,69 @@ export default function SeatSelection() {
   const navigate = useNavigate();
 
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [selectedTime, setSelectedTime] = useState("");
+  const selectedTime = event?.time || "";
+  const selectedDate = parseToISODate(event?.date);
   const [bookedSeats, setBookedSeats] = useState([]);
+  const [loadingSeats, setLoadingSeats] = useState(false);
+  const [seatError, setSeatError] = useState("");
 
   const maxTickets = 10;
 
   useEffect(() => {
-    if (event) {
-      const stored = JSON.parse(localStorage.getItem(`booked_${event.id}`)) || [];
-      setBookedSeats(stored);
+    if (!event || !selectedTime || !selectedDate) {
+      setBookedSeats([]);
+      setSeatError("");
+      return;
     }
-  }, [event]);
+
+    const fetchBookedSeats = async () => {
+      setLoadingSeats(true);
+      setSeatError("");
+
+      try {
+        const token = localStorage.getItem('access');
+        if (!token) {
+          throw new Error('Authentication required to fetch booked seats.');
+        }
+
+        const response = await API.get('/bookings/occupied', {
+          params: {
+            eventId: event.id,
+            date: selectedDate,
+            time: selectedTime,
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setBookedSeats(response.data.seats || []);
+      } catch (error) {
+        console.error('Failed to load booked seats:', error);
+        setSeatError('Unable to load currently booked seats. Please refresh.');
+      } finally {
+        setLoadingSeats(false);
+      }
+    };
+
+    fetchBookedSeats();
+  }, [event, selectedTime, selectedDate]);
+
+  const selectedSeatPrices = useMemo(
+    () =>
+      selectedSeats.map((seatId) => {
+        const type = getSeatType(seatId.charAt(0));
+        return SEAT_META[type].price;
+      }),
+    [selectedSeats],
+  );
+
+  const selectedUnitPrice = selectedSeatPrices.length > 0 ? selectedSeatPrices[0] : event?.price || 0;
 
   const total = useMemo(
     () =>
-      selectedSeats.reduce((sum, seatId) => {
-        const type = getSeatType(seatId.charAt(0));
-        return sum + SEAT_META[type].price;
-      }, 0),
-    [selectedSeats],
+      selectedSeatPrices.reduce((sum, price) => sum + price, 0),
+    [selectedSeatPrices],
   );
 
   const toggleSeat = (seatId) => {
@@ -55,10 +107,17 @@ export default function SeatSelection() {
   };
 
   const handleProceed = () => {
-    if (!selectedSeats.length || !selectedTime) return;
-    const updatedBooked = [...bookedSeats, ...selectedSeats];
-    localStorage.setItem(`booked_${event.id}`, JSON.stringify(updatedBooked));
-    navigate("/payment", { state: { event, seats: selectedSeats, total, time: selectedTime } });
+    if (!selectedSeats.length || !selectedTime || !selectedDate) return;
+    navigate("/payment", {
+      state: {
+        event,
+        seats: selectedSeats,
+        total,
+        time: selectedTime,
+        date: selectedDate,
+        unitPrice: selectedUnitPrice,
+      },
+    });
   };
 
   if (!event)
@@ -69,7 +128,10 @@ export default function SeatSelection() {
       </div>
     );
 
-  const canProceed = selectedSeats.length > 0 && !!selectedTime;
+  const isMovieEvent = event?.type === "movies";
+  const locationLabel = isMovieEvent ? "Theater" : "Venue";
+  const locationName = event.venue || (isMovieEvent ? "Cineplex" : "Main Venue");
+  const canProceed = selectedSeats.length > 0 && !!selectedTime && !!selectedDate;
 
   return (
     <main className="ss-page">
@@ -80,31 +142,11 @@ export default function SeatSelection() {
         </button>
         <div className="ss-header__info">
           <h1 className="ss-title">{event.name}</h1>
-          <span className="ss-subtitle">
-            {event.venue || "Cineplex"} &bull; {event.date || "Today"}
-          </span>
+          <span className="ss-subtitle">{locationLabel}: {locationName}</span>
         </div>
         <div className="ss-header__badges">
           <span className="ss-badge ss-badge--ua">U/A</span>
           <span className="ss-badge ss-badge--format">2D</span>
-        </div>
-      </div>
-
-      {/* ── Show-Time Row ── */}
-      <div className="ss-time-section">
-        <p className="ss-section-label">Select Show Time</p>
-        <div className="ss-time-row">
-          {TIMES.map((time) => (
-            <button
-              key={time}
-              type="button"
-              onClick={() => setSelectedTime(time)}
-              className={`ss-time-btn${selectedTime === time ? " ss-time-btn--active" : ""}`}
-            >
-              <span className="ss-time-btn__time">{time}</span>
-              <span className="ss-time-btn__tag">Available</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -148,6 +190,18 @@ export default function SeatSelection() {
               <span className="ss-count-bar__warn">Maximum reached</span>
             )}
           </div>
+
+          {selectedTime && (
+            <div className="ss-seat-info">
+              {loadingSeats ? (
+                <span>Loading booked seats...</span>
+              ) : seatError ? (
+                <span className="ss-seat-error">{seatError}</span>
+              ) : (
+                <span>{bookedSeats.length} seats already booked</span>
+              )}
+            </div>
+          )}
 
           {/* Seat Grid */}
           <div className="ss-seat-map">
@@ -242,18 +296,12 @@ export default function SeatSelection() {
               )}
               <div>
                 <p className="ss-sidebar__event-name">{event.name}</p>
-                <p className="ss-sidebar__event-venue">{event.venue || "Cineplex"}</p>
+                <p className="ss-sidebar__event-venue">{locationLabel}: {locationName}</p>
               </div>
             </div>
 
             {/* Details rows */}
             <div className="ss-info-rows">
-              <div className="ss-info-row">
-                <span>Show Time</span>
-                <span className={selectedTime ? "ss-val--set" : "ss-val--muted"}>
-                  {selectedTime || "—"}
-                </span>
-              </div>
               <div className="ss-info-row">
                 <span>Seats</span>
                 <span className={selectedSeats.length ? "ss-val--set" : "ss-val--muted"}>
@@ -296,9 +344,7 @@ export default function SeatSelection() {
 
             {!canProceed && (
               <p className="ss-pay-hint">
-                {!selectedTime
-                  ? "⏰ Please select a show time"
-                  : "🪑 Please select at least one seat"}
+                {!selectedTime ? "Please go back and select a show first" : "Please select at least one seat"}
               </p>
             )}
           </div>

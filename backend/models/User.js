@@ -26,9 +26,40 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
     otp: {
       code: String,
       expiresAt: Date,
+    },
+    wallet: {
+      balance: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      transactions: [
+        {
+          type: {
+            type: String,
+            enum: ['credit', 'debit'],
+            required: true,
+          },
+          amount: {
+            type: Number,
+            required: true,
+          },
+          description: String,
+          bookingId: mongoose.Schema.Types.ObjectId,
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
     },
   },
   { timestamps: true }
